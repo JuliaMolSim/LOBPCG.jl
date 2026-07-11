@@ -35,29 +35,27 @@ N, nev = 500, 6
 M = randn(N, N); A = Hermitian(M + M') + 50I   # some Hermitian operator
 X0 = randn(N, nev)                              # initial guess (one column per eigenvector)
 
-res = lobpcg_hyper(A, X0; tol=1e-8, prec=Diagonal(A))
+res = lobpcg(A, X0, I, Diagonal(A), 1e-8, 200)  # (A, X, B, precon, tol, maxiter)
 
 res.λ                # the nev smallest eigenvalues (on the CPU)
 res.X                # the corresponding eigenvectors
-res.converged        # convergence flag
 res.residual_norms   # per-eigenvector residual norms
 ```
 
-`A` only needs to support `mul!(Y, A, X)` (matrix-vector products against a block of
-vectors), so matrix-free operators work. A preconditioner `prec` is any object
-supporting `ldiv!`; if it also supports adaptive updates it may implement
-`precondprep!(prec, X)`, which is called before each application.
+`A`, `B` and the preconditioner only need to support `mul!`/`ldiv!` against a block of
+vectors, so matrix-free operators work. If the preconditioner supports adaptive updates
+it may implement `precondprep!(prec, X)`, which is called before each application.
 
-`diag_full(A, X0)` is provided as a dense reference solver (full diagonalization),
-mostly for testing and small problems.
+## Scope
 
-## Scope and limitations
+- Computes the `size(X, 2)` **smallest** eigenpairs.
+- Solves the **standard** eigenproblem, or the **generalized** problem `A x = λ B x`
+  when a symmetric positive-definite metric `B` is passed (both paths are tested).
 
-- Only the **smallest** eigenpairs are computed (`largest=true` is rejected).
-- `lobpcg_hyper` solves the **standard** eigenproblem. The low-level
-  `lobpcg(A, X, B, ...)` entry point additionally accepts a symmetric
-  positive-definite metric `B` for the generalized problem `A x = λ B x` (both paths
-  are tested).
+This package deliberately contains only the solver itself. Higher-level conveniences
+(default tolerances, a `converged` flag, k-point drivers, physics preconditioners) live
+in the caller — see [DFTK.jl](https://github.com/JuliaMolSim/DFTK.jl)'s `lobpcg_hyper`
+wrapper for an example.
 
 ## License
 

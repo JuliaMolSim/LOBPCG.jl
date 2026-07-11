@@ -4,17 +4,18 @@ function test_matrix(T, N; shift=20)
     Hermitian(A + A') + shift * I
 end
 
-@testset "lobpcg_hyper matches dense diagonalization" begin
+# Reference: the nev smallest eigenvalues by dense diagonalization
+ref_eigvals(A, nev) = sort(eigen(Hermitian(Matrix(A))).values)[1:nev]
+
+@testset "lobpcg matches dense diagonalization" begin
     for T in (Float64, ComplexF64)
         N, nev = 60, 5
         A = test_matrix(T, N)
         X0 = rand(T, N, nev)
 
-        ref = diag_full(A, X0)
-        res = lobpcg_hyper(A, X0; tol=1e-9, prec=Diagonal(A))
+        res = lobpcg(A, X0, I, Diagonal(A), 1e-9, 200)
 
-        @test res.converged
-        @test res.λ ≈ ref.λ
+        @test res.λ ≈ ref_eigvals(A, nev)
         @test maximum(res.residual_norms) < 1e-8
         # Returned eigenvectors are orthonormal
         @test norm(res.X' * res.X - I) < 1e-8
@@ -23,13 +24,13 @@ end
     end
 end
 
-@testset "lobpcg_hyper without preconditioner" begin
+@testset "lobpcg without preconditioner" begin
     N, nev = 60, 4
     A = test_matrix(Float64, N)
     X0 = rand(N, nev)
-    res = lobpcg_hyper(A, X0; tol=1e-8)
-    @test res.converged
-    @test res.λ ≈ diag_full(A, X0).λ atol=1e-7
+    res = lobpcg(A, X0, I, I, 1e-8, 200)
+    @test res.λ ≈ ref_eigvals(A, nev) atol=1e-7
+    @test maximum(res.residual_norms) < 1e-7
 end
 
 # A well-conditioned symmetric positive-definite metric with eigenvalues in [1, 3].
@@ -51,10 +52,4 @@ end
     @test norm(A * res.X - B * res.X * Diagonal(res.λ)) < 1e-6
     # B-orthonormality of the returned eigenvectors
     @test norm(res.X' * B * res.X - I) < 1e-7
-end
-
-@testset "largest keyword is rejected" begin
-    A = test_matrix(Float64, 40)
-    X0 = rand(40, 3)
-    @test_throws AssertionError lobpcg_hyper(A, X0; largest=true)
 end

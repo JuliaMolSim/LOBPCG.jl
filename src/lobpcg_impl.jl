@@ -356,8 +356,22 @@ end
 ### R is then recomputed, and orthonormalized explicitly wrt BX and BP
 ### We reuse applications of A/B when it is safe to do so, ie only with orthogonal transformations
 
-# Note that this function will return λ on the CPU,
-# but X and the history on the device (for GPU runs)
+"""
+    lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
+           miniter=1, ortho_tol, n_conv_check, callback)
+
+Compute the `size(X, 2)` smallest eigenpairs of the Hermitian operator `A` (optionally
+for the generalized problem `A x = λ B x` with a symmetric positive-definite metric
+`B`), using the LOBPCG algorithm started from the block of initial vectors `X`.
+
+`A`, `B` and `precon` only need to support `mul!`/`ldiv!` against a block of vectors, so
+matrix-free operators work. `precon` is an optional preconditioner (supporting `ldiv!`,
+and optionally `precondprep!`).
+
+Returns a named tuple `(; λ, X, AX, BX, residual_norms, residual_history, n_matvec)`.
+Eigenvalues `λ` are returned on the CPU; `X` and the history stay on the input device
+(relevant for GPU runs).
+"""
 @timing function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
                         miniter=1, ortho_tol=2eps(real(eltype(X))),
                         n_conv_check=nothing, callback=identity)

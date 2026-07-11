@@ -5,7 +5,7 @@
 
     # Run the callback to make sure it works, but don't print anything
     res = redirect_stdout(devnull) do
-        lobpcg_hyper(A, X; prec=Diagonal(A), callback=DefaultLobpcgCallback(), tol=1e-6)
+        lobpcg(A, X, I, Diagonal(A), 1e-6, 100; callback=DefaultLobpcgCallback())
     end
-    @test res.converged
+    @test maximum(res.residual_norms) < 1e-5
 end
