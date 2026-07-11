@@ -138,7 +138,7 @@ end
 
 
 # Perform a Rayleigh-Ritz for the N first eigenvectors.
-@timing function rayleigh_ritz(X, AX, N)
+function rayleigh_ritz(X, AX, N)
     XAX = mul_hermi(X', AX)
     @assert !any(isnan, UpperTriangular(parent(XAX)))
     rayleigh_ritz(XAX, N)
@@ -213,7 +213,7 @@ normest(M) = maximum(abs, diag(M)) + norm(M - Diagonal(diag(M)))
 # Orthogonalizes X to tol
 # Returns the new X, the number of Cholesky factorizations algorithm, and the
 # growth factor by which small perturbations of X can have been magnified
-@timing function ortho!(X::AbstractArray{T}; tol=2eps(real(T))) where {T}
+function ortho!(X::AbstractArray{T}; tol=2eps(real(T))) where {T}
     growth_factor   = one(real(T))
     estimated_error = one(real(T))
 
@@ -268,7 +268,7 @@ function drop_small!(X::AbstractArray{T}; tol=2eps(real(T))) where {T}
 end
 
 # Find X that is orthogonal, and B-orthogonal to Y, up to a tolerance tol.
-@timing "ortho! X vs Y" function ortho!(X::AbstractArray{T}, Y, BY; tol=2eps(real(T))) where {T}
+function ortho!(X::AbstractArray{T}, Y, BY; tol=2eps(real(T))) where {T}
     # normalize to try to cheaply improve conditioning
     X ./= columnwise_norms(X)'
 
@@ -371,12 +371,15 @@ Returns a named tuple `(; λ, X, AX, BX, residual_norms, residual_history, n_mat
 Eigenvalues `λ` are returned on the CPU; `X` and the history stay on the input device
 (relevant for GPU runs).
 """
-@timing function lobpcg(@nospecialize(A), X, @nospecialize(B)=I, @nospecialize(precon)=I,
-                        tol=1e-10, maxiter=100;
-                        miniter=1, ortho_tol=2eps(real(eltype(X))),
-                        n_conv_check=nothing, callback=identity)
-    # A, B and precon are @nospecialize'd for time-to-first-solve: only reached through
-    # mul!/ldiv!, so not specializing on them has negligible runtime impact.
+function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
+               miniter=1, ortho_tol=2eps(real(eltype(X))),
+               n_conv_check=nothing, callback=identity)
+    # A, B and precon are @nospecialize'd for time-to-first-solve: they are only reached
+    # through mul!/ldiv!, so not specializing the (large) body on them has negligible
+    # runtime impact but avoids recompiling it for each new operator/preconditioner type.
+    # Written as a body statement because an argument-list `@nospecialize` is silently
+    # dropped for arguments that have a default value (here B=I, precon=I).
+    @nospecialize A B precon
     N, M = size(X)
 
     # If N is too small, we will likely get in trouble
@@ -463,21 +466,17 @@ Eigenvalues `λ` are returned on the CPU; `X` and the history stay on the input 
         end
 
         ### Compute new residuals
-        @timing "Update residuals" begin
-            new_R .= new_AX .- new_BX .* λs'
-            norms = to_cpu(columnwise_norms(new_R))
-            @views resid_history[1 + nlocked: size(new_R, 2) + nlocked, niter+1] .= norms[:]
-        end
+        new_R .= new_AX .- new_BX .* λs'
+        norms = to_cpu(columnwise_norms(new_R))
+        @views resid_history[1 + nlocked: size(new_R, 2) + nlocked, niter+1] .= norms[:]
         @debug niter resid_history[:, niter+1]
 
         # it is actually a good question of knowing when to
         # precondition. Here seems sensible, but it could plausibly be
         # done before or after
         if precon !== I
-            @timing "preconditioning" begin
-                precondprep!(precon, new_X)  # update preconditioner if needed; defaults to noop
-                ldiv!(precon, new_R)
-            end
+            precondprep!(precon, new_X)  # update preconditioner if needed; defaults to noop
+            ldiv!(precon, new_R)
         end
 
         ### Compute number of locked vectors
@@ -621,7 +620,7 @@ function (cb::DefaultLobpcgCallback)(info)
     runtime_ns = current_time - cb.prev_time[]
     cb.prev_time[] = current_time
 
-    time = @sprintf "% 6s" TimerOutputs.prettytime(runtime_ns)
+    time = @sprintf "% 6s" prettytime(runtime_ns)
     resid_norm = norm(info.resid_history[1:info.n_conv_check, info.n_iter+1])
     resid_str = " " * format_log8(resid_norm)
 
