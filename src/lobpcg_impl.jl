@@ -371,7 +371,13 @@ Returns a named tuple `(; λ, X, AX, BX, residual_norms, residual_history, n_mat
 Eigenvalues `λ` are returned on the CPU; `X` and the history stay on the input device
 (relevant for GPU runs).
 """
-@timing function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
+# `A`, `B` and `precon` are `@nospecialize`d: the body only reaches them through
+# `mul!`/`ldiv!` (where the matvec dominates the cost anyway), so specializing this
+# large body on each new operator type just multiplies compilation time. Left opaque,
+# `lobpcg` compiles roughly once per element type of `X`, which is what makes the
+# precompile workload robust across operator types (dense, `Hermitian`, matrix-free).
+@timing function lobpcg(@nospecialize(A), X, @nospecialize(B)=I, @nospecialize(precon)=I,
+                        tol=1e-10, maxiter=100;
                         miniter=1, ortho_tol=2eps(real(eltype(X))),
                         n_conv_check=nothing, callback=identity)
     N, M = size(X)
