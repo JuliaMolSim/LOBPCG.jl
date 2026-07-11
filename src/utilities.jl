@@ -33,22 +33,10 @@ end
     [dot(A[:, i], B[:, i]) for i = 1:size(A, 2)]
 end
 
-# Returns a vector of dot(A[:, i], M, B[:, i]), for all columns of A, B and matrix M
-@views function columnwise_dots(A::AbstractArray{T}, M, B::AbstractArray{T}) where {T}
-    [dot(A[:, i], M, B[:, i]) for i = 1:size(A, 2)]
-end
-
-# GPU-specific implementations. The massive parallelism of the GPU can only be
-# fully exploited when operating on whole arrays, so we avoid explicitly looping
-# over columns or elements.
+# GPU-specific implementation: the massive parallelism of the GPU is only fully
+# exploited by operating on whole arrays rather than looping over columns.
 function columnwise_dots(A::AbstractGPUArray{T}, B::AbstractGPUArray{T}) where {T}
     vec(sum(conj(A) .* B; dims=1))
-end
-function columnwise_dots(A::AbstractGPUArray{T}, M, B::AbstractGPUArray{T}) where {T}
-    vec(sum(conj(A) .* (M * B); dims=1))
-end
-function columnwise_dots(A::AbstractGPUArray{T}, D::Diagonal, B::AbstractGPUArray{T}) where {T}
-    vec(sum(conj(A) .* (D.diag .* B); dims=1))
 end
 
 format_log8(e) = @sprintf "%8.2f" log10(abs(e))

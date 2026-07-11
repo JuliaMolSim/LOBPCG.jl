@@ -46,7 +46,6 @@
 
 import LinearAlgebra: BlasFloat
 import Base: *
-import Base.size, Base.adjoint, Base.Array
 
 """
 Simple wrapper to represent a matrix formed by the concatenation of
@@ -609,11 +608,6 @@ end
 DefaultLobpcgCallback() = DefaultLobpcgCallback(Ref(zero(UInt64)))
 
 function (cb::DefaultLobpcgCallback)(info)
-    if info.stage == :finalize
-        info.converged || @warn "Lobpcg not converged."
-        return info
-    end
-
     if info.n_iter == 0
         cb.prev_time[] = time_ns()
         println("Iter     Converged     log10(resid)    time  \n")

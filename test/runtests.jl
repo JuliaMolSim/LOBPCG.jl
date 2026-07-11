@@ -3,7 +3,7 @@ using LinearAlgebra
 using Random
 using Test
 
-using LOBPCG: LazyHcat, mul_hermi, lobpcg, ortho!
+using LOBPCG: LazyHcat, mul_hermi, ortho!
 
 Random.seed!(0)
 
