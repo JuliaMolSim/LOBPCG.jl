@@ -41,6 +41,24 @@ end
 
 format_log8(e) = @sprintf "%8.2f" log10(abs(e))
 
+# Compact human-readable rendering of a duration given in nanoseconds, to ~3 significant
+# figures with an adaptive unit, e.g. "4.56s", "27.7ms", "812μs". Used by the default
+# callback's time column; the stdlib alternative (`Dates.canonicalize`) is coarser and
+# verbose ("4 seconds, 560 milliseconds"), so we format it here.
+function prettytime(t)
+    value, units = t < 1e3 ? (t,       "ns") :
+                   t < 1e6 ? (t / 1e3, "μs") :
+                   t < 1e9 ? (t / 1e6, "ms") :
+                             (t / 1e9, "s")
+    if round(value) >= 100
+        @sprintf("%.0f%s", value, units)
+    elseif round(value * 10) >= 100
+        @sprintf("%.1f%s", value, units)
+    else
+        @sprintf("%.2f%s", value, units)
+    end
+end
+
 # Preconditioner API (also used in Optim.jl): if the solver supports adaptive
 # preconditioning it will call `precondprep!(P, X)` right before applying the
 # preconditioner. The default is a no-op; concrete preconditioners may override it.
