@@ -13,5 +13,6 @@ export DefaultLobpcgCallback
 include("timer.jl")
 include("utilities.jl")
 include("lobpcg_impl.jl")
+include("precompile.jl")
 
 end
