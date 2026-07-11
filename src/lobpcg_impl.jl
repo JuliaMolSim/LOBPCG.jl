@@ -401,6 +401,7 @@ end
         BR = zero(X)
         # BX was already computed
         BP = zero(X)
+        new_BP = zero(X)  # parallel to new_P/new_AP; only its active columns are used
     else
         # The B arrays are just pointers to the same data
         BR = R

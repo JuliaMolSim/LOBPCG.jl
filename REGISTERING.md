@@ -73,9 +73,9 @@ is registered.
 
 ## Notes carried over from the extraction
 
-- Only the **standard** eigenproblem (`B = I`) is tested/supported. The low-level
-  `lobpcg(A, X, B, …)` metric argument is preserved but its `B != I` path has
-  pre-existing latent bugs and is intentionally left uncovered.
+- The generalized eigenproblem (`lobpcg(A, X, B, …)` with an SPD metric `B`) works and
+  is tested. During extraction a pre-existing latent bug on that path was fixed
+  (`new_BP` was used before assignment); DFTK itself only ever calls with `B = I`.
 - The AMDGPU `LinearAlgebra` workarounds (Cholesky / gesdd! / 5-arg mul!) moved here
   from DFTK's AMDGPU extension; they load via `LOBPCGAMDGPUExt` whenever AMDGPU is
   present.

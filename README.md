@@ -54,10 +54,10 @@ mostly for testing and small problems.
 ## Scope and limitations
 
 - Only the **smallest** eigenpairs are computed (`largest=true` is rejected).
-- The **standard** eigenproblem (`B = I`) is what is exercised and tested. The
-  low-level `lobpcg(A, X, B, ...)` entry point accepts a metric `B` for the
-  generalized problem `A x = λ B x`, but that path is currently untested and carries
-  known latent issues — use it at your own risk.
+- `lobpcg_hyper` solves the **standard** eigenproblem. The low-level
+  `lobpcg(A, X, B, ...)` entry point additionally accepts a symmetric
+  positive-definite metric `B` for the generalized problem `A x = λ B x` (both paths
+  are tested).
 
 ## License
 

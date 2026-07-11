@@ -32,9 +32,26 @@ end
     @test res.λ ≈ diag_full(A, X0).λ atol=1e-7
 end
 
-# NOTE: the generalized eigenproblem path (B != I) is currently untested and
-# unused (DFTK only ever calls the solver with B = I). It carries pre-existing
-# latent bugs and is intentionally left uncovered here; see README.
+# A well-conditioned symmetric positive-definite metric with eigenvalues in [1, 3].
+function spd_metric(N)
+    Q = Matrix(qr(randn(N, N)).Q)
+    Hermitian(Q * Diagonal(range(1.0, 3.0, N)) * Q')
+end
+
+@testset "generalized eigenproblem (B != I)" begin
+    N, nev = 60, 4
+    A = test_matrix(Float64, N)
+    B = spd_metric(N)
+    X0 = rand(N, nev)
+
+    res = lobpcg(A, X0, B, Diagonal(A), 1e-9, 200)
+    ref = sort(eigen(Matrix(A), Matrix(B)).values)[1:nev]
+    @test res.λ ≈ ref atol=1e-7
+    # Residual of the generalized eigenproblem A x = λ B x
+    @test norm(A * res.X - B * res.X * Diagonal(res.λ)) < 1e-6
+    # B-orthonormality of the returned eigenvectors
+    @test norm(res.X' * B * res.X - I) < 1e-7
+end
 
 @testset "largest keyword is rejected" begin
     A = test_matrix(Float64, 40)
