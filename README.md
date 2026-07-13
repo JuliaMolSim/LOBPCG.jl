@@ -10,10 +10,9 @@ dependency-light package. The algorithm and its implementation are described in
 [this paper](https://hal.science/hal-04094087).
 
 The implementation follows the scheme of Hetmaniuk & Lehoucq (with refinements from
-Duersch et al.) and is designed to be *very hard to break*, even at tight tolerances:
+Duersch et al.) and is designed to be *very hard to break*, even at tight tolerances.
 
-- Cholesky-based orthogonalization (fast, with a shifted-overlap fallback for
-  ill-conditioned blocks and an SVD gold-standard fallback).
+- Repeated Cholesky based fast orthogonalization with careful stabilization.
 - Careful locking of converged eigenvectors with minimal impact on the others.
 - Reuse of matrix–vector products wherever it is numerically safe.
 - Works transparently on the **CPU and the GPU** — the same code path runs on plain
