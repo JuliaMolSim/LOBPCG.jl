@@ -1,12 +1,13 @@
-# LOBPCG.jl
+# LOBPCGEigensolver.jl
 
-[![CI](https://github.com/JuliaMolSim/LOBPCG.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/JuliaMolSim/LOBPCG.jl/actions/workflows/CI.yml)
+[![CI](https://github.com/JuliaMolSim/LOBPCGEigensolver.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/JuliaMolSim/LOBPCGEigensolver.jl/actions/workflows/CI.yml)
 
 A stability-focused implementation of the **Locally Optimal Block Preconditioned
 Conjugate Gradient (LOBPCG)** algorithm for computing the lowest eigenpairs of a
 large Hermitian operator. It was originally developed inside
 [DFTK.jl](https://github.com/JuliaMolSim/DFTK.jl) and extracted into a standalone,
-dependency-light package.
+dependency-light package. The algorithm and its implementation are described in
+[this paper](https://hal.science/hal-04094087).
 
 The implementation follows the scheme of Hetmaniuk & Lehoucq (with refinements from
 Duersch et al.) and is designed to be *very hard to break*, even at tight tolerances:
@@ -23,13 +24,13 @@ Duersch et al.) and is designed to be *very hard to break*, even at tight tolera
 
 ```julia
 using Pkg
-Pkg.add("LOBPCG")
+Pkg.add("LOBPCGEigensolver")
 ```
 
 ## Usage
 
 ```julia
-using LOBPCG, LinearAlgebra
+using LOBPCGEigensolver, LinearAlgebra
 
 N, nev = 500, 6
 M = randn(N, N); A = Hermitian(M + M') + 50I   # some Hermitian operator
@@ -51,11 +52,6 @@ it may implement `precondprep!(prec, X)`, which is called before each applicatio
 - Computes the `size(X, 2)` **smallest** eigenpairs.
 - Solves the **standard** eigenproblem, or the **generalized** problem `A x = λ B x`
   when a symmetric positive-definite metric `B` is passed (both paths are tested).
-
-This package deliberately contains only the solver itself. Higher-level conveniences
-(default tolerances, a `converged` flag, k-point drivers, physics preconditioners) live
-in the caller — see [DFTK.jl](https://github.com/JuliaMolSim/DFTK.jl)'s `lobpcg_hyper`
-wrapper for an example.
 
 ## License
 

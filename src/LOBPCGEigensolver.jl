@@ -1,4 +1,4 @@
-module LOBPCG
+module LOBPCGEigensolver
 
 using LinearAlgebra
 using Printf

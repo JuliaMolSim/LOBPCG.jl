@@ -1,13 +1,13 @@
-using LOBPCG
+using LOBPCGEigensolver
 using LinearAlgebra
 using Random
 using Test
 
-using LOBPCG: LazyHcat, mul_hermi, ortho!
+using LOBPCGEigensolver: LazyHcat, mul_hermi, ortho!
 
 Random.seed!(0)
 
-@testset "LOBPCG.jl" begin
+@testset "LOBPCGEigensolver.jl" begin
     include("lazyhcat.jl")
     include("ortho.jl")
     include("diagonalization.jl")

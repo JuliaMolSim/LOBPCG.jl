@@ -1,4 +1,4 @@
-name = "LOBPCG"
+name = "LOBPCGEigensolver"
 uuid = "87a0849e-8492-4fcc-8734-ba6a5d902784"
 authors = ["Michael F. Herbst <info@michael-herbst.com>", "Antoine Levitt <antoine.levitt@inria.fr>"]
 version = "0.1.0"
@@ -14,7 +14,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 
 [extensions]
-LOBPCGAMDGPUExt = "AMDGPU"
+LOBPCGEigensolverAMDGPUExt = "AMDGPU"
 
 [compat]
 AMDGPU = "1.2.3, 2"

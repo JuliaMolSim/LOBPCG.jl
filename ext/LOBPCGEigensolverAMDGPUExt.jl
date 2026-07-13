@@ -1,4 +1,4 @@
-module LOBPCGAMDGPUExt
+module LOBPCGEigensolverAMDGPUExt
 using AMDGPU
 using LinearAlgebra
 
