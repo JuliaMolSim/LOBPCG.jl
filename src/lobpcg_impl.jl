@@ -44,6 +44,14 @@
 ## TODO it seems there is a lack of orthogonalization immediately after locking, maybe investigate this to save on some Choleskys
 ## TODO debug orthogonalizations when A=I
 
+
+# Default for the `timer` keyword of `lobpcg`: a disabled timer makes the `@timeit`
+# annotations record nothing (they only check the `enabled` flag), so a caller that does
+# not care about timings pays nothing for them.
+const disabled_timer = TimerOutput()
+disable_timer!(disabled_timer)
+
+
 import LinearAlgebra: BlasFloat
 import Base: *
 
@@ -268,7 +276,8 @@ function drop_small!(X::AbstractArray{T}; tol=2eps(real(T))) where {T}
 end
 
 # Find X that is orthogonal, and B-orthogonal to Y, up to a tolerance tol.
-function ortho!(X::AbstractArray{T}, Y, BY; tol=2eps(real(T))) where {T}
+function ortho!(X::AbstractArray{T}, Y, BY; tol=2eps(real(T)),
+                timer=disabled_timer) where {T}
     # normalize to try to cheaply improve conditioning
     X ./= columnwise_norms(X)'
 
@@ -289,7 +298,7 @@ function ortho!(X::AbstractArray{T}, Y, BY; tol=2eps(real(T))) where {T}
             push!(ninners, 0)
             break
         end
-        X, ninner, growth_factor = ortho!(X; tol)
+        X, ninner, growth_factor = @timeit timer "ortho!" ortho!(X; tol)
         push!(ninners, ninner)
 
         # norm(BY'X) < tol && break should be the proper check, but
@@ -357,7 +366,7 @@ end
 
 """
     lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
-           miniter=1, ortho_tol, n_conv_check, callback)
+           miniter=1, ortho_tol, n_conv_check, callback, timer)
 
 Compute the `size(X, 2)` smallest eigenpairs of the Hermitian operator `A` (optionally
 for the generalized problem `A x = λ B x` with a symmetric positive-definite metric
@@ -370,16 +379,13 @@ and optionally `precondprep!`).
 Returns a named tuple `(; λ, X, AX, BX, residual_norms, residual_history, n_matvec)`.
 Eigenvalues `λ` are returned on the CPU; `X` and the history stay on the input device
 (relevant for GPU runs).
+
+The time spent in the individual steps can be recorded into the `TimerOutputs.TimerOutput`
+passed as `timer`.
 """
 function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
                miniter=1, ortho_tol=2eps(real(eltype(X))),
-               n_conv_check=nothing, callback=identity)
-    # A, B and precon are @nospecialize'd for time-to-first-solve: they are only reached
-    # through mul!/ldiv!, so not specializing the (large) body on them has negligible
-    # runtime impact but avoids recompiling it for each new operator/preconditioner type.
-    # Written as a body statement because an argument-list `@nospecialize` is silently
-    # dropped for arguments that have a default value (here B=I, precon=I).
-    @nospecialize A B precon
+               n_conv_check=nothing, callback=identity, timer=disabled_timer)
     N, M = size(X)
 
     # If N is too small, we will likely get in trouble
@@ -393,16 +399,16 @@ function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
     resid_history = zeros(real(eltype(X)), M, maxiter+1)
 
     # B-orthogonalize X
-    X = ortho!(copy(X), tol=ortho_tol)[1]
+    X = @timeit timer "ortho!" ortho!(copy(X), tol=ortho_tol)[1]
     if B != I
         BX = similar(X)
-        BX = mul!(BX, B, X)
+        BX = @timeit timer "B matvec" mul!(BX, B, X)
         B_ortho!(X, BX)
     end
 
     n_matvec = M  # Count number of matrix-vector products
     AX = similar(X)
-    AX = mul!(AX, A, X)
+    AX = @timeit timer "matvec" mul!(AX, A, X)
     @assert !any(isnan, AX)
     # full_X/AX/BX will always store the full (including locked) X.
     # X/AX/BX only point to the active part
@@ -440,7 +446,7 @@ function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
     while true
         if niter > 0  # first iteration is just to compute the residuals (no X update)
             ###  Perform the Rayleigh-Ritz
-            mul!(AR, A, R)
+            @timeit timer "matvec" mul!(AR, A, R)
             n_matvec += size(R, 2)
 
             # Form Rayleigh-Ritz subspace
@@ -453,7 +459,7 @@ function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
                 AY = LazyHcat(AX, AR)
                 BY = LazyHcat(BX, BR)  # data shared with (X, R) in non-general case
             end
-            cX, λs_RR = rayleigh_ritz(Y, AY, M-nlocked)
+            cX, λs_RR = @timeit timer "rayleigh_ritz" rayleigh_ritz(Y, AY, M-nlocked)
             λs .= λs_RR
 
             # Update X. By contrast to some other implementations, we
@@ -466,17 +472,21 @@ function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
         end
 
         ### Compute new residuals
-        new_R .= new_AX .- new_BX .* λs'
-        norms = to_cpu(columnwise_norms(new_R))
-        @views resid_history[1 + nlocked: size(new_R, 2) + nlocked, niter+1] .= norms[:]
+        @timeit timer "Update residuals" begin
+            new_R .= new_AX .- new_BX .* λs'
+            norms = to_cpu(columnwise_norms(new_R))
+            @views resid_history[1 + nlocked: size(new_R, 2) + nlocked, niter+1] .= norms[:]
+        end
         @debug niter resid_history[:, niter+1]
 
         # it is actually a good question of knowing when to
         # precondition. Here seems sensible, but it could plausibly be
         # done before or after
         if precon !== I
-            precondprep!(precon, new_X)  # update preconditioner if needed; defaults to noop
-            ldiv!(precon, new_R)
+            @timeit timer "preconditioning" begin
+                precondprep!(precon, new_X)  # update preconditioner if needed; defaults to noop
+                ldiv!(precon, new_R)
+            end
         end
 
         ### Compute number of locked vectors
@@ -525,7 +535,7 @@ function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
             cP = cX .- e
             cP = cP[:, Xn_indices]
             # orthogonalize against all Xn (including newly locked)
-            ortho!(cP, cX, cX, tol=ortho_tol)
+            @timeit timer "ortho! X vs Y" ortho!(cP, cX, cX; tol=ortho_tol, timer)
 
             @views begin
                 new_P = new_P[:, Xn_indices]
@@ -591,9 +601,9 @@ function lobpcg(A, X, B=I, precon=I, tol=1e-10, maxiter=100;
             Z  = full_X
             BZ = full_BX
         end
-        ortho!(R, Z, BZ; tol=ortho_tol)
+        @timeit timer "ortho! X vs Y" ortho!(R, Z, BZ; tol=ortho_tol, timer)
         if B != I
-            mul!(BR, B, R)
+            @timeit timer "B matvec" mul!(BR, B, R)
             B_ortho!(R, BR)
         end
 
