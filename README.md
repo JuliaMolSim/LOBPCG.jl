@@ -46,6 +46,17 @@ res.residual_norms   # per-eigenvector residual norms
 vectors, so matrix-free operators work. If the preconditioner supports adaptive updates
 it may implement `precondprep!(prec, X)`, which is called before each application.
 
+To profile where the solver spends its time, pass a `TimerOutputs.TimerOutput` as the
+`timer` keyword; the time of the individual steps (matrix-vector products,
+orthogonalization, Rayleigh-Ritz, preconditioning) is recorded into it:
+
+```julia
+using TimerOutputs
+to = TimerOutput()
+lobpcg(A, X0, I, Diagonal(A), 1e-8, 200; timer=to)
+print_timer(to)
+```
+
 ## Scope
 
 - Computes the `size(X, 2)` **smallest** eigenpairs.
